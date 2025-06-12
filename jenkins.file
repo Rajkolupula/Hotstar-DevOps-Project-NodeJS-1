@@ -1,0 +1,98 @@
+pipeline {
+    agent any
+
+    tools {
+        jdk 'jdk'              // Make sure 'jdk' is configured in Global Tools
+        nodejs 'node16'        // Ensure 'node16' is configured in NodeJS Tools
+    }
+
+    environment {
+        SCANNER_HOME = tool 'sonar-scanner'  // Set Sonar scanner path
+    }
+
+    stages {
+
+        stage('Clean Workspace') {
+            steps {
+                cleanWs()
+            }
+        }
+
+        stage('Checkout from Git') {
+            steps {
+                git branch: 'main', url: 'https://github.com/Rajkolupula/Hotstar-DevOps-Project-NodeJS.git'
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('sonar-server') {
+                    sh '''
+                        $SCANNER_HOME/bin/sonar-scanner \
+                        -Dsonar.projectName=Hotstar \
+                        -Dsonar.projectKey=Hotstar
+                    '''
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-Token'
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                sh 'npm install'
+            }
+        }
+
+        stage('Docker Build & Push') {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'docker', toolName: 'docker') {
+                        sh 'docker build -t hotstar .'
+                        sh 'docker tag hotstar veeranarni/hotstar:latest'
+                        sh 'docker push veeranarni/hotstar:latest'
+                    }
+                }
+            }
+        }
+
+        stage('Image Scanner') {
+            steps {
+                sh 'trivy image veeranarni/hotstar:latest'
+            }
+        }
+
+        stage('Deploy Docker Locally') {
+            steps {
+                sh 'docker run -d --name hotstar -p 3000:3000 veeranarni/hotstar:latest'
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    dir('K8S') {
+                        withKubeConfig(
+                            credentialsId: 'k8s',
+                            clusterName: '',
+                            contextName: '',
+                            namespace: '',
+                            serverUrl: '',
+                            restrictKubeConfigAccess: false,
+                            caCertificate: ''
+                        ) {
+                            sh 'aws eks update-kubeconfig --name raj --region ap-south-1'
+                            sh 'kubectl apply -f deployment.yml'
+                            sh 'kubectl apply -f service.yml'
+                        }
+                    }
+                }
+            }
+        }
+
+    }
+}
