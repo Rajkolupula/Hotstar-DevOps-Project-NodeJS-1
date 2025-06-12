@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hotstar-blue
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hotstar
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: hotstar
+        version: blue
+    spec:
+      containers:
+      - name: hotstar
+        image: rajukolupula/hotstar:latest
+        ports:
+        - containerPort: 3000
