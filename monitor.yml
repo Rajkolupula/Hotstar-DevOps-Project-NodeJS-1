@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: hotstar-monitor
+  labels:
+    release: prometheus  # This must match your Prometheus installation label
+spec:
+  selector:
+    matchLabels:
+      app: hotstar
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
